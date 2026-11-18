@@ -384,6 +384,10 @@ async function resolveModelsFolderPath(logger: SimpleLogger) {
       if (typeof modelsFolderPath !== "string") {
         throw new Error("downloadsFolder is not a string");
       }
+      // Expand ~ to home directory
+      if (modelsFolderPath.startsWith("~/")) {
+        modelsFolderPath = join(homedir(), modelsFolderPath.slice(2));
+      }
     } catch (error) {
       logger.warn(
         "Could not parse LM Studio configuration file, using default path:",

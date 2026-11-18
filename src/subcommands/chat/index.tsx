@@ -209,6 +209,38 @@ chatCommand.action(async (model, options: ChatCommandOptions) => {
   await using client = await createClient(logger, options);
   const { dontFetchCatalog, yes } = options;
 
+  // Show usage when verbose is enabled and no model/prompt is provided
+  if (options.verbose === true && !process.stdin.isTTY && providedPrompt.length === 0) {
+    process.stdout.write(text`
+      Usage: lms chat [model]
+
+      Start an interactive chat with a model.
+
+      Options:
+        -p, --prompt <prompt>   Print response to stdout and quit
+        -s, --system-prompt <systemPrompt>  Custom system prompt to use for the chat
+        --stats                 Display detailed prediction statistics after each response
+        --ttl <ttl>             Time (in seconds) to keep the model loaded after the chat ends (default: 3600)
+        --reasoning <mode>      Reasoning mode for this chat session (default: auto, choices: auto, never, always)
+        --dont-fetch-catalog    Skip fetching the model catalog
+        -y, --yes               Assume 'yes' as answer to all CLI prompts
+        --log-level <level>     The level of logging to use (choices: debug, info, warn, error, none)
+        --quiet                 Suppress all logging
+        --verbose               Enable verbose logging
+        --host <host>           Remote host to connect to
+        --port <port>           Port to connect to
+
+      Examples:
+        lms chat                           Start interactive chat
+        lms chat mistral-7b               Start chat with specific model
+        lms chat -p "Hello"               Print response to stdout
+        lms chat --stats -p "Hello"       Print response with statistics
+
+      To exit the chat, type /exit or press Ctrl+C.
+    `);
+    process.exit(0);
+  }
+
   let providedPrompt = "";
   if (options.prompt !== undefined && options.prompt !== "") {
     providedPrompt = options.prompt;

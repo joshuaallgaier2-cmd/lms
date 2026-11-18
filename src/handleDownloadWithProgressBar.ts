@@ -27,14 +27,25 @@ export async function handleDownloadWithProgressBar(
   }: HandleDownloadWithProgressBarOpts = {},
 ) {
   let isAskingExitingBehavior = false;
+  let isSecondSigint = false;
   let canceled = false;
   const pb = new ProgressBar(0, "", 22);
   const updatePb = createDownloadPbUpdater(pb);
   const abortController = new AbortController();
   const sigintListener = () => {
     process.removeListener("SIGINT", sigintListener);
-    process.once("SIGINT", () => {
+    if (isSecondSigint) {
+      // Second Ctrl+C - cancel immediately
+      process.stdin.resume();
+      logger.info("Download canceled.");
+      abortController.abort();
+      canceled = true;
       process.exit(1);
+    }
+    // First Ctrl+C - ask to continue in background
+    process.once("SIGINT", () => {
+      isSecondSigint = true;
+      sigintListener();
     });
     pb.stopWithoutClear();
     isAskingExitingBehavior = true;

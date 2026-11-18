@@ -31,9 +31,12 @@ type ServerStartCommandOptions = OptionValues &
     cors?: boolean;
   };
 
-type ServerStopCommandOptions = OptionValues & CreateClientArgs & LogLevelArgs;
+type ServerStopCommandOptions = OptionValues & CreateClientArgs & LogLevelArgs & {
+  bind?: string;
+};
 
 type ServerStatusCommandOptions = OptionValues &
+  CreateClientArgs &
   LogLevelArgs & {
     json?: boolean;
   };
@@ -151,7 +154,14 @@ start.action(async options => {
 
 const stop = new Command<[], ServerStopCommandOptions>()
   .name("stop")
-  .description("Stops the local server");
+  .description("Stops the local server")
+  .option(
+    "--bind <address>",
+    text`
+      Network address the server is bound to. If not specified, defaults to 127.0.0.1.
+      Use this option when the server is bound to a specific network interface.
+    `,
+  );
 
 addLogLevelOptions(stop);
 
@@ -164,10 +174,12 @@ stop.action(async options => {
     process.exit(1);
   }
   const config = await getServerConfig(logger, localAPIServer).catch(() => undefined);
-  if (
-    config === undefined ||
-    !(await checkHttpServer(logger, config.port, config.networkInterface))
-  ) {
+  if (config === undefined) {
+    logger.error(`The server is not running.`);
+    process.exit(1);
+  }
+  const host = options.bind ?? "127.0.0.1";
+  if (!(await checkHttpServer(logger, config.port, host))) {
     logger.error(`The server is not running.`);
     process.exit(1);
   }
@@ -181,11 +193,20 @@ const status = new Command<[], ServerStatusCommandOptions>()
   .name("status")
   .description("Displays the status of the local server")
   .option(
+    "--bind <address>",
+    text`
+      Network address the server is bound to. If not specified, defaults to 127.0.0.1.
+      Use this option when the server is bound to a specific network interface.
+    `,
+  )
+  .option(
     "--json",
     text`
       Outputs the status in JSON format to stdout.
   `,
   );
+
+addCreateClientOptions(status);
 
 addLogLevelOptions(status);
 
@@ -193,7 +214,8 @@ addLogLevelOptions(status);
 status.action(async options => {
   const logger = createLogger(options);
   const localAPIServer = await tryFindLocalAPIServer({ logger });
-  const { json = false } = options;
+  const { json = false, bind } = options;
+  const host = bind ?? "127.0.0.1";
   const config =
     localAPIServer === null
       ? undefined
@@ -203,7 +225,7 @@ status.action(async options => {
         });
   const port = config?.port;
   const running =
-    config !== undefined && (await checkHttpServer(logger, config.port, config.networkInterface));
+    config !== undefined && (await checkHttpServer(logger, config.port, host));
   if (json) {
     process.stdout.write(JSON.stringify({ running, port }) + "\n");
     return;

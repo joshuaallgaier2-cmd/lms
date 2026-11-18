@@ -5,11 +5,12 @@ import {
 } from "@lmstudio/lms-common-server";
 import { spawn } from "child_process";
 import { once } from "events";
-import { readFileSync } from "fs";
+import { readFileSync, rmSync } from "fs";
 import { dirname, join } from "path";
 import { setTimeout } from "timers/promises";
 import { z } from "zod";
 import { apiServerInfoPath, lmstudioHome } from "./lmstudioPaths.js";
+import { exists } from "./exists.js";
 
 export interface LocalAPIServer extends APIServerStatus {
   /** Discovery, authentication, and REST settings must belong to the same app. */
@@ -122,6 +123,15 @@ export async function findOrStartLocalAPIServer({
         argv: processArguments,
         cwd: workingDirectory = dirname(executablePath),
       } = installLocationSchema.parse(JSON.parse(readFileSync(join(home, relativePath), "utf-8")));
+      
+      // Check if the executable path exists before attempting to spawn.
+      // This handles stale install locations (e.g., AppImage temporary mount points).
+      if (!(await exists(executablePath))) {
+        logger.debug(`Executable not found at ${executablePath}, removing stale installation record`);
+        rmSync(join(home, relativePath));
+        continue;
+      }
+      
       const launchArguments = processArguments[1] === "." ? ["."] : [];
       if (!relativePath.endsWith("llmster-install-location.json")) {
         launchArguments.push("--run-as-service");
